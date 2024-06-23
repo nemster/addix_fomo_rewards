@@ -1,23 +1,36 @@
 use scrypto::prelude::*;
 
-static USER_NFT_NAME: &str = "TODO"
-static USER_NFT_ICON: &str = "https://TODO"
+static USER_NFT_NAME: &str = "TODO";
+static USER_NFT_ICON: &str = "https://TODO";
 
 #[derive(Debug, ScryptoSbor, NonFungibleData)]
 struct UserNftData {
     creation_date: Instant,
+    #[mutable]
     last_rewards_withdraw: Instant,
+    #[mutable]
     total_rewards_withdrawed: Decimal,
 }
 
 //TODO: rewards and new user events
 
 #[blueprint]
-#[types(u64, Decimal)]
-mod stable {
+#[types(u64, Decimal, UserNftData)]
+mod addix_fomo_rewards {
 
-    struct Stable {
-        lsu_address: ResourceAddress,
+    enable_method_auth! {
+        roles {
+            airdropper => updatable_by: [OWNER];
+        },
+        methods {
+            mint_user_nft => PUBLIC;
+            deposit_future_rewards => restrict_to: [OWNER];
+            assign_rewards => restrict_to: [airdropper];
+            withdraw_rewards => PUBLIC;
+        }
+    }
+
+    struct AddixFomoRewards {
         user_nft_resource_manager: ResourceManager,
         last_user_nft_id: u64,
         rewards_vault: Vault,
@@ -25,27 +38,17 @@ mod stable {
         assigned_rewards: KeyValueStore<u64, Decimal>,
     }
 
-    enable_method_auth! {
-        methods {
-            mint_user_nft => PUBLIC;
-            deposit_future_rewards => PUBLIC;
-            assign_rewards => restrict_to: [airdropper];
-            withdraw_rewards => PUBLIC;
-        }
-    }
-
-    impl Stable {
+    impl AddixFomoRewards {
 
         pub fn new(
                 owner_badge_address: ResourceAddress,
-                lsu_address: ResourceAddress,
                 rewards_address: ResourceAddress,
                 airdropper_badge_address: ResourceAddress,
-            ) -> Global<Stable> {
+            ) -> Global<AddixFomoRewards> {
 
             // Reserve a ComponentAddress for setting rules on resources
             let (address_reservation, component_address) =
-                Runtime::allocate_component_address(Stable::blueprint_id());
+                Runtime::allocate_component_address(AddixFomoRewards::blueprint_id());
 
             let user_nft_resource_manager = ResourceBuilder::new_integer_non_fungible_with_registered_type::<UserNftData>(
                 OwnerRole::Updatable(rule!(require(owner_badge_address)))
@@ -85,7 +88,6 @@ mod stable {
             .create_with_no_initial_supply();
 
             Self {
-                lsu_address: lsu_address,
                 user_nft_resource_manager: user_nft_resource_manager,
                 last_user_nft_id: 0,
                 rewards_vault: Vault::new(rewards_address),
@@ -95,7 +97,7 @@ mod stable {
             .instantiate()
             .prepare_to_globalize(OwnerRole::Updatable(rule!(require(owner_badge_address))))
             .roles(roles!(
-                airdroppper => rule!(require(airdropper_badge_address));
+                airdropper => rule!(require(airdropper_badge_address));
             ))
             .with_address(address_reservation)
             .globalize()
@@ -138,7 +140,7 @@ mod stable {
                 "user and rewards have different lenght"
             );
 
-            for i in 0 .. user.len() {
+            for i in 0 .. users.len() {
                 let user = users[i];
                 assert!(
                     user > 0 && user <= self.last_user_nft_id,
