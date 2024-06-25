@@ -1,8 +1,5 @@
 use scrypto::prelude::*;
 
-static USER_NFT_NAME: &str = "TODO";
-static USER_NFT_ICON: &str = "https://TODO";
-
 #[derive(ScryptoSbor)]
 struct Reward {
     vault: Vault,
@@ -65,10 +62,6 @@ mod addix_fomo_rewards {
                     metadata_setter_updater => rule!(require(owner_badge_address));
                     metadata_locker => rule!(require(owner_badge_address));
                     metadata_locker_updater => rule!(require(owner_badge_address));
-                },
-                init {
-                    "name" => USER_NFT_NAME.to_string(), updatable;
-                    "icon_url" => MetadataValue::Url(UncheckedUrl::of(USER_NFT_ICON.to_string())), updatable;
                 }
             ))
             .mint_roles(mint_roles!(
