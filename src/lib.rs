@@ -8,11 +8,12 @@ struct UserNftData {
     creation_date: Instant,
     #[mutable]
     last_rewards_withdraw: Instant,
-    #[mutable]
-    total_rewards_withdrawed: Decimal,
 }
 
-//TODO: rewards and new user events
+#[derive(ScryptoSbor, ScryptoEvent)]
+struct NewUserNftEvent {
+    id: u64,
+}
 
 #[blueprint]
 #[types(u64, Decimal, UserNftData)]
@@ -113,12 +114,15 @@ mod addix_fomo_rewards {
 
             let now = Clock::current_time_rounded_to_seconds();
 
+            Runtime::emit_event(NewUserNftEvent {
+                id: self.last_user_nft_id,
+            });
+
             self.user_nft_resource_manager.mint_non_fungible(
                 &NonFungibleLocalId::integer(self.last_user_nft_id.into()),
                 UserNftData {
                     creation_date: now,
                     last_rewards_withdraw: now,
-                    total_rewards_withdrawed: Decimal::ZERO,
                 }
             )
         }
@@ -176,7 +180,7 @@ mod addix_fomo_rewards {
 
             let user_nft_data = checked_proof.non_fungible::<UserNftData>().data();
 
-            // TODO: withdraw rewards, mark rewards, increase counter and data
+            // TODO: withdraw rewards, mark rewards, update data
         }
     }
 }
