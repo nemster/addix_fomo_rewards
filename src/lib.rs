@@ -3,8 +3,16 @@ use scrypto::prelude::*;
 static USER_NFT_NAME: &str = "TODO";
 static USER_NFT_ICON: &str = "https://TODO";
 
+#[derive(ScryptoSbor)]
+struct Reward {
+    vault: Vault,
+    total_assigned: Decimal,
+    assigned: KeyValueStore<u64, Decimal>,
+}
+
 #[derive(Debug, ScryptoSbor, NonFungibleData)]
 struct UserNftData {
+    id: u64,
     creation_date: Instant,
     #[mutable]
     last_rewards_withdraw: Instant,
@@ -16,7 +24,7 @@ struct NewUserNftEvent {
 }
 
 #[blueprint]
-#[types(u64, Decimal, UserNftData)]
+#[types(u64, Decimal, UserNftData, Reward)]
 mod addix_fomo_rewards {
 
     enable_method_auth! {
@@ -34,16 +42,13 @@ mod addix_fomo_rewards {
     struct AddixFomoRewards {
         user_nft_resource_manager: ResourceManager,
         last_user_nft_id: u64,
-        rewards_vault: Vault,
-        assigned_rewards_quantity: Decimal,
-        assigned_rewards: KeyValueStore<u64, Decimal>,
+        rewards: Vec<Reward>,
     }
 
     impl AddixFomoRewards {
 
         pub fn new(
                 owner_badge_address: ResourceAddress,
-                rewards_address: ResourceAddress,
                 airdropper_badge_address: ResourceAddress,
             ) -> Global<AddixFomoRewards> {
 
@@ -91,9 +96,7 @@ mod addix_fomo_rewards {
             Self {
                 user_nft_resource_manager: user_nft_resource_manager,
                 last_user_nft_id: 0,
-                rewards_vault: Vault::new(rewards_address),
-                assigned_rewards_quantity: Decimal::ZERO,
-                assigned_rewards: KeyValueStore::new_with_registered_type(),
+                rewards: vec![],
             }
             .instantiate()
             .prepare_to_globalize(OwnerRole::Updatable(rule!(require(owner_badge_address))))
@@ -107,11 +110,6 @@ mod addix_fomo_rewards {
         pub fn mint_user_nft(&mut self) -> Bucket {
             self.last_user_nft_id += 1;
 
-            self.assigned_rewards.insert(
-                self.last_user_nft_id,
-                Decimal::ZERO
-            );
-
             let now = Clock::current_time_rounded_to_seconds();
 
             Runtime::emit_event(NewUserNftEvent {
@@ -121,6 +119,7 @@ mod addix_fomo_rewards {
             self.user_nft_resource_manager.mint_non_fungible(
                 &NonFungibleLocalId::integer(self.last_user_nft_id.into()),
                 UserNftData {
+                    id: self.last_user_nft_id,
                     creation_date: now,
                     last_rewards_withdraw: now,
                 }
@@ -131,48 +130,75 @@ mod addix_fomo_rewards {
             &mut self,
             future_rewards: Bucket
         ) {
-            self.rewards_vault.put(future_rewards);
+            for i in 0 .. self.rewards.len() {
+                if self.rewards[i].vault.resource_address() == future_rewards.resource_address() {
+                    self.rewards[i].vault.put(future_rewards);
+                    return;
+                }
+            }
+
+            self.rewards.push(
+                Reward {
+                    vault: Vault::with_bucket(future_rewards),
+                    total_assigned: Decimal::ZERO,
+                    assigned: KeyValueStore::new_with_registered_type(),
+                }
+            );
         }
 
         pub fn assign_rewards(
             &mut self,
             users: Vec<u64>,
-            rewards: Vec<Decimal>,
+            amounts: Vec<Decimal>,
+            coin: ResourceAddress,
         ) {
             assert!(
-                users.len() == rewards.len(),
-                "user and rewards have different lenght"
+                users.len() == amounts.len(),
+                "users and amounts have different lenght"
             );
 
-            for i in 0 .. users.len() {
-                let user = users[i];
-                assert!(
-                    user > 0 && user <= self.last_user_nft_id,
-                    "User out of bounds: {}",
-                    user
-                );
+            for j in 0 .. self.rewards.len() {
+                if coin == self.rewards[j].vault.resource_address() {
 
-                let reward = rewards[i];
-                assert!(
-                    reward > Decimal::ZERO,
-                    "Reward below or equal to zero: {}",
-                    reward
-                );
+                    for i in 0 .. users.len() {
+                        let user = users[i];
+                        assert!(
+                            user > 0 && user <= self.last_user_nft_id,
+                            "User out of bounds: {}",
+                            user
+                        );
 
-                *self.assigned_rewards.get_mut(&user).unwrap() += reward;
+                        let reward = amounts[i];
+                        assert!(
+                            reward > Decimal::ZERO,
+                            "Reward below or equal to zero: {}",
+                            reward
+                        );
 
-                self.assigned_rewards_quantity += reward;
+                        if self.rewards[j].assigned.get(&user).is_some() {
+                            *self.rewards[j].assigned.get_mut(&user).unwrap() += reward;
+                        } else {
+                            self.rewards[j].assigned.insert(user, reward);
+                        }
+
+                        self.rewards[j].total_assigned += reward;
+                    }
+
+                    assert!(self.rewards[j].vault.amount() >= self.rewards[j].total_assigned,
+                        "assigned rewards > available rewards"
+                    );
+
+                    return;
+                }
             }
 
-            assert!(self.rewards_vault.amount() >= self.assigned_rewards_quantity,
-                "assigned rewards > available rewards"
-            );
+            Runtime::panic("Coin not found".to_string());
         }
 
         pub fn withdraw_rewards(
             &mut self,
             user_proof: Proof
-        ) -> Bucket {
+        ) -> Vec<Bucket> {
             let checked_proof = user_proof.check_with_message(
                 self.user_nft_resource_manager.address(),
                 "Incorrect proof",
@@ -180,7 +206,26 @@ mod addix_fomo_rewards {
 
             let user_nft_data = checked_proof.non_fungible::<UserNftData>().data();
 
-            // TODO: withdraw rewards, mark rewards, update data
+            self.user_nft_resource_manager.update_non_fungible_data(
+                &NonFungibleLocalId::Integer(user_nft_data.id.into()),
+                "last_rewards_withdraw",
+                Clock::current_time_rounded_to_seconds(),
+            );
+
+            let mut buckets: Vec<Bucket> = vec![];
+
+            for i in 0 .. self.rewards.len() {
+                let reward = &mut self.rewards[i];
+                if reward.assigned.get(&user_nft_data.id).is_some() {
+                    buckets.push(
+                        reward.vault.take( // TODO: check number of digits for this coin!
+                            *reward.assigned.get(&user_nft_data.id).unwrap()
+                        )
+                    );
+                }
+            }
+
+            buckets
         }
     }
 }
