@@ -145,6 +145,14 @@ fn test_addix_fomo_rewards() -> Result<(), RuntimeError> {
         user2_reward2_amount
     );
 
+    // Distribute more reward1 coins to user #2
+    addix_fomo_rewards.assign_rewards(
+        vec![2],
+        vec![dec!("1")],
+        reward1_address,
+        &mut env
+    )?;
+
     // Distribute more reward2 coins to user #2
     addix_fomo_rewards.assign_rewards(
         vec![2],
@@ -170,7 +178,7 @@ fn test_addix_fomo_rewards() -> Result<(), RuntimeError> {
         "wrong reward2 received by user #2"
     );
     assert!(
-        user2_reward1_amount == dec!("0"),
+        user2_reward1_amount == dec!("1"),
         "wrong reward1 amount received by user #2 in the second round: {}",
         user2_reward1_amount
     );

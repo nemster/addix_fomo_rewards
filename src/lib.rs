@@ -1,5 +1,6 @@
 use scrypto::prelude::*;
 
+// Struct representing a 
 #[derive(ScryptoSbor)]
 struct Reward {
     vault: Vault,
@@ -217,6 +218,8 @@ mod addix_fomo_rewards {
                     );
 
                     *reward.assigned.get_mut(&user_nft_data.id).unwrap() -= bucket.amount();
+
+                    reward.total_assigned -= bucket.amount();
 
                     buckets.push(bucket);
                 }
