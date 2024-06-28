@@ -6,6 +6,8 @@ version = 3
 name = "addix_fomo_rewards"
 version = "1.0.0"
 dependencies = [
+ "addix_fomo_rewards",
+ "radix-engine-interface",
  "scrypto",
  "scrypto-test",
 ]

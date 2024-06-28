@@ -7,7 +7,9 @@ edition = "2021"
 scrypto = { version = "1.2.0" }
 
 [dev-dependencies]
+radix-engine-interface = { version = "1.2.0" }
 scrypto-test = { version = "1.2.0" }
+addix_fomo_rewards = { path = ".", features = ["test"] }
 
 [profile.release]
 opt-level = 'z'        # Optimize for size.
@@ -19,6 +21,7 @@ overflow-checks = true # Panic in the case of an overflow.
 
 [features]
 default = []
+test = []
 
 [lib]
 crate-type = ["cdylib", "lib"]

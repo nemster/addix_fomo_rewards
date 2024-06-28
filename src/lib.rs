@@ -22,6 +22,7 @@ struct NewUserNftEvent {
 
 #[blueprint]
 #[types(u64, Decimal, UserNftData, Reward)]
+#[events(NewUserNftEvent)]
 mod addix_fomo_rewards {
 
     enable_method_auth! {
@@ -210,11 +211,14 @@ mod addix_fomo_rewards {
             for i in 0 .. self.rewards.len() {
                 let reward = &mut self.rewards[i];
                 if reward.assigned.get(&user_nft_data.id).is_some() {
-                    buckets.push(
-                        reward.vault.take( // TODO: check number of digits for this coin!
-                            *reward.assigned.get(&user_nft_data.id).unwrap()
-                        )
+                    let bucket = reward.vault.take_advanced(
+                        *reward.assigned.get(&user_nft_data.id).unwrap(),
+                        WithdrawStrategy::Rounded(RoundingMode::ToZero)
                     );
+
+                    *reward.assigned.get_mut(&user_nft_data.id).unwrap() -= bucket.amount();
+
+                    buckets.push(bucket);
                 }
             }
 
