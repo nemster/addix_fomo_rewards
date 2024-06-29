@@ -1,5 +1,7 @@
 use scrypto::prelude::*;
 
+static MAX_REWARDS: usize = 100;
+
 // Struct representing one of the coins to be used as rewards
 #[derive(ScryptoSbor)]
 struct Reward {
@@ -43,7 +45,7 @@ mod addix_fomo_rewards {
     struct AddixFomoRewards {
         user_nft_resource_manager: ResourceManager,
         last_user_nft_id: u64,
-        rewards: Vec<Reward>,
+        rewards: HashMap<ResourceAddress, Reward>,
     }
 
     impl AddixFomoRewards {
@@ -96,7 +98,7 @@ mod addix_fomo_rewards {
             Self {
                 user_nft_resource_manager: user_nft_resource_manager,
                 last_user_nft_id: 0,
-                rewards: vec![],
+                rewards: HashMap::new(),
             }
             .instantiate()
             .prepare_to_globalize(OwnerRole::Updatable(rule!(require(owner_badge_address))))
@@ -139,22 +141,31 @@ mod addix_fomo_rewards {
             &mut self,
             future_rewards: Bucket
         ) {
-            // If there's already a Reward struct for this coin, just use it
-            for i in 0 .. self.rewards.len() {
-                if self.rewards[i].vault.resource_address() == future_rewards.resource_address() {
-                    self.rewards[i].vault.put(future_rewards);
-                    return;
-                }
-            }
+            let reward = self.rewards.get_mut(&future_rewards.resource_address());
+            if reward.is_some() {
 
-            // If not, add a new Reward struct to the list
-            self.rewards.push(
-                Reward {
-                    vault: Vault::with_bucket(future_rewards),
-                    total_assigned: Decimal::ZERO,
-                    assigned: KeyValueStore::new_with_registered_type(),
-                }
-            );
+                // If there's already a Reward struct for this coin, just use it
+                reward.unwrap().vault.put(future_rewards);
+
+            } else {
+
+                // If not, check that the number of Rewards isn't too big
+                assert!(
+                    self.rewards.len() < MAX_REWARDS,
+                    "Exceeded {} reward tokens",
+                    MAX_REWARDS
+                );
+
+                // Then a new Reward struct to the list
+                self.rewards.insert(
+                    future_rewards.resource_address(),
+                    Reward {
+                        vault: Vault::with_bucket(future_rewards),
+                        total_assigned: Decimal::ZERO,
+                        assigned: KeyValueStore::new_with_registered_type()
+                    }
+                );
+            }
         }
 
         // The airdropper bot can use this method to assing the previously deposited rewards to
@@ -166,61 +177,44 @@ mod addix_fomo_rewards {
         // before this one.
         pub fn assign_rewards(
             &mut self,
-            users: Vec<u64>,
-            amounts: Vec<Decimal>,
+            rewards: HashMap<u64, Decimal>,
             coin: ResourceAddress,
         ) {
-            assert!(
-                users.len() == amounts.len(),
-                "users and amounts have different lenght"
-            );
+            let reward = self.rewards.get_mut(&coin).expect("coin not found");
 
-            // Search the coin in the list
-            for j in 0 .. self.rewards.len() {
-                if coin == self.rewards[j].vault.resource_address() {
+            // For each user id in the Vec
+            for (user, amount) in rewards.iter() {
 
-                    // For each user id in the Vec
-                    for i in 0 .. users.len() {
-                        let user = users[i];
+                // Check that the user exists
+                assert!(
+                    *user > 0 && *user <= self.last_user_nft_id,
+                    "User out of bounds: {}",
+                    *user
+                );
 
-                        // Check that the user exists
-                        assert!(
-                            user > 0 && user <= self.last_user_nft_id,
-                            "User out of bounds: {}",
-                            user
-                        );
+                assert!(
+                    *amount > Decimal::ZERO,
+                    "Amount below or equal to zero: {}",
+                    *amount
+                );
 
-                        let reward = amounts[i];
-                        assert!(
-                            reward > Decimal::ZERO,
-                            "Reward below or equal to zero: {}",
-                            reward
-                        );
-
-                        // Assign the reward to the user, eventually adding a new item to the
-                        // assigned KeyValueStore
-                        if self.rewards[j].assigned.get(&user).is_some() {
-                            *self.rewards[j].assigned.get_mut(&user).unwrap() += reward;
-                        } else {
-                            self.rewards[j].assigned.insert(user, reward);
-                        }
-
-                        // Update the total number of assigned coins
-                        self.rewards[j].total_assigned += reward;
-                    }
-
-                    // Make sure the total of assigned coins is not greater than the total
-                    // deposited coins
-                    assert!(self.rewards[j].vault.amount() >= self.rewards[j].total_assigned,
-                        "assigned rewards > available rewards"
-                    );
-
-                    return;
+                // Assign the reward to the user, eventually adding a new item to the
+                // assigned KeyValueStore
+                if reward.assigned.get(user).is_some() {
+                    *reward.assigned.get_mut(user).unwrap() += *amount;
+                } else {
+                    reward.assigned.insert(*user, *amount);
                 }
+
+                // Update the total number of assigned coins
+                reward.total_assigned += *amount;
             }
 
-            // This coin has never beed deposited
-            Runtime::panic("Coin not found".to_string());
+            // Make sure the total of assigned coins is not greater than the total
+            // deposited coins
+            assert!(reward.vault.amount() >= reward.total_assigned,
+                "assigned rewards > available rewards"
+            );
         }
 
         // Anyone with a user badge can use this method to withdraw his rewards.
@@ -249,9 +243,7 @@ mod addix_fomo_rewards {
             let mut buckets: Vec<Bucket> = vec![];
 
             // For each coin
-            for i in 0 .. self.rewards.len() {
-                let reward = &mut self.rewards[i];
-
+            for (_resource_address, reward) in self.rewards.iter_mut() {
                 // If the user has beed assigned this coin as reward
                 if reward.assigned.get(&user_nft_data.id).is_some() {
 

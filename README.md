@@ -1,7 +1,7 @@
 # ADDIX+FOMO validator node rewards distribution blueprint
 
 ## This blueprint has the following characteristics
-* Users have to register anonymously with their Radix wallet to get an NFT. A UserEvent is emitted when this happens.
+* Users have to register anonymously with their Radix wallet to get an NFT. A NewUserNftEvent is emitted when this happens.
 * User badges are soulbound.
 * The owner can deposit the rewards ahead of time (rug proof), before actually assigning them to users. Different rewards are allowed.
 * The presence of a scheduled offchain operation that takes a snapshot of the LSU distribution is required; this scheduled operation must inform the component about the rewards to be distributed.
@@ -16,7 +16,7 @@
 ### Instantiate the component (Stokenet)
 ```
 CALL_FUNCTION
-    Address("package_tdx_2_1p583d3dwvaq93r7t82fz9u4yls3ca7xgk8ec8wskkxw4q30n4jph3q")
+    Address("package_tdx_2_1pkfjc2lkdnfektnjhwjqpg2ps00f6uw9tehkg3qxmuwkgntfh4qm6f")
     "AddixFomoRewards"
     "new"
     Address("<OWNER_BADGE>")
@@ -73,8 +73,7 @@ CALL_METHOD
 CALL_METHOD
     Address("<COMPONENT_ADDRESS>")
     "assign_rewards"
-    Array<U64>(<USER_BADGE_ID>u64, <USER_BADGE_ID>u64...)
-    Array<Decimal>(Decimal("<AMOUNT>"), Decimal("<AMOUNT>")...)
+    Map<U64, Decimal>(<USER_BADGE_ID>u64 => Decimal("<AMOUNT>"), <USER_BADGE_ID>u64  => Decimal("<AMOUNT>")...)
     Address("<REWARDS_RESOURCE_ADDRESS>")
 ;
 ```

@@ -69,24 +69,30 @@ fn test_addix_fomo_rewards() -> Result<(), RuntimeError> {
 
     // Distribute reward1 coins to both users
     addix_fomo_rewards.assign_rewards(
-        vec![1, 2],
-        vec![dec!("10"), dec!("1")],
+        HashMap::from([
+            (1, dec!("10")),
+            (2, dec!("1"))
+        ]),
         reward1_address,
         &mut env
     )?;
 
     // Distribute reward2 coins to both users
     addix_fomo_rewards.assign_rewards(
-        vec![1, 2],
-        vec![dec!("1.006"), dec!("2.006")],
+        HashMap::from([
+            (1, dec!("1.006")),
+            (2, dec!("2.006"))
+        ]),
         reward2_address,
         &mut env
     )?;
 
     // Distribute more reward2 coins to both users
     addix_fomo_rewards.assign_rewards(
-        vec![1, 2],
-        vec![dec!("1"), dec!("1.005")],
+        HashMap::from([
+            (1, dec!("1")),
+            (2, dec!("1.005"))
+        ]),
         reward2_address,
         &mut env
     )?;
@@ -147,16 +153,14 @@ fn test_addix_fomo_rewards() -> Result<(), RuntimeError> {
 
     // Distribute more reward1 coins to user #2
     addix_fomo_rewards.assign_rewards(
-        vec![2],
-        vec![dec!("1")],
+        HashMap::from([(2, dec!("1"))]),
         reward1_address,
         &mut env
     )?;
 
     // Distribute more reward2 coins to user #2
     addix_fomo_rewards.assign_rewards(
-        vec![2],
-        vec![dec!("4.0095")],
+        HashMap::from([(2, dec!("4.0095"))]),
         reward2_address,
         &mut env
     )?;
