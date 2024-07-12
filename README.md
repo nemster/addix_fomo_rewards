@@ -24,6 +24,17 @@ CALL_FUNCTION
 ;
 ```
 
+### Instantiate the component (Mainnet)
+```
+CALL_FUNCTION
+    Address("package_rdx1pkwdx5h29trtveqg0jmjr4tqtq4ysf5xnrgg90l7r4rvpwl446f0ku")
+    "AddixFomoRewards"
+    "new"
+    Address("<OWNER_BADGE>")
+    Address("<AIRDROPPER_BADGE>")
+;
+```
+
 ### Mint an user badge
 ```
 CALL_METHOD
