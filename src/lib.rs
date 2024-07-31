@@ -2,6 +2,8 @@ use scrypto::prelude::*;
 
 static MAX_REWARDS: usize = 100;
 
+static IMAGE: &str = "https://addix.meme/hit-fomo-nft.jpg";
+
 // Struct representing one of the coins to be used as rewards
 #[derive(ScryptoSbor)]
 struct Reward {
@@ -15,6 +17,8 @@ struct Reward {
 struct UserNftData {
     id: u64,
     creation_date: Instant,
+    #[mutable]
+    key_image_url: Url,
     #[mutable]
     last_rewards_withdraw: Instant,
 }
@@ -129,6 +133,7 @@ mod addix_fomo_rewards {
                 UserNftData {
                     id: self.last_user_nft_id,
                     creation_date: now,
+                    key_image_url: UncheckedUrl::of(IMAGE.to_string()),
                     last_rewards_withdraw: now,
                 }
             )

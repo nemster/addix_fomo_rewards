@@ -13,21 +13,10 @@
 
 ## Below are the transaction manifests needed to use this contract:
 
-### Instantiate the component (Stokenet)
-```
-CALL_FUNCTION
-    Address("package_tdx_2_1pkfjc2lkdnfektnjhwjqpg2ps00f6uw9tehkg3qxmuwkgntfh4qm6f")
-    "AddixFomoRewards"
-    "new"
-    Address("<OWNER_BADGE>")
-    Address("<AIRDROPPER_BADGE>")
-;
-```
-
 ### Instantiate the component (Mainnet)
 ```
 CALL_FUNCTION
-    Address("package_rdx1pkwdx5h29trtveqg0jmjr4tqtq4ysf5xnrgg90l7r4rvpwl446f0ku")
+    Address("package_rdx1pk3n6vr996fsws5s8zahjtvytm6sa8vdd5yz9pprjv8h4m0ehm5g2k")
     "AddixFomoRewards"
     "new"
     Address("<OWNER_BADGE>")
